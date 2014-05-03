@@ -1,8 +1,7 @@
 import urllib
 import re
 from pymongo import *
-import sys
-
+import os
 
 URL = 'http://diagnosticodesintomas.com'
 htmlfile = urllib.urlopen(URL)
@@ -37,36 +36,31 @@ def getEnfermedadesByURLs(urls):
             print temp
             enfermedades[n] = temp
             colenfermedades.insert(collection)
-         
-        #except AttributeError, IndexError:
-        #    print "ERROR de Atributos"
-        #    break
-        #except IndexError:
-        #    print "ERROR de Indice"
-        #    break
-        except:
-            pass
+        except Exception as e:
+            print "ERROR: ", n
+            print e
     print enfermedades
     return enfermedades
 
-def insertCaracteristicasInCollection(caracteristicas, i):
+def findCaracteristicasInCollection(caracteristicas, i):
     collections = {}
     for j in range(len(caracteristicas[i])):
         try:
-            print "    SINTOMA: " + caracteristicas[i][j].decode('utf-8')
-            collection = { 'id': idCalculate(i,j),  'description': caracteristicas[i][j].decode('utf-8') , 'enfermedadId': i}
-            print collection
-            colcaracteristicas.insert(collection)
-            collections['caracteristica_'+str(j)] = { 'id': idCalculate(i,j),  'description': caracteristicas[i][j].decode('utf-8') , 'enfermedadId': i}
+            #print "    SINTOMA: " + caracteristicas[i][j].decode('utf-8')
+            collection = { 'description': caracteristicas[i][j].decode('utf-8') }
+            #print collection
+            collection = colcaracteristicas.find(collection)
+            collections[str(j)] = { 'id': collection._id }
         except Exception as e:
             print "ERROR: ", j
             print e
+    print "COLECCION: ",collections
     return collections
 
 def updateEnfermedades(collections, i):
-    print ''
-    print 'COLLECTIONs: ' 
-    print collections
+    #print ''
+    #print 'COLLECTIONs: ' 
+    #print collections
     try:
         colenfermedades.update( { 'id': i }, { '$set' : { 'caracteristicas': collections } } )
     except Exception as e:
@@ -84,11 +78,12 @@ def getCaracteristicasByEnfermedades(urls):
         caracteristicas[i] = re.findall(pattern, html)
         
         try:
-            print enfermedades[i]
-            collections = insertCaracteristicasInCollection(caracteristicas, i)
+            print "ENFERMEDAD: ", enfermedades[i]
+            collections = findCaracteristicasInCollection(caracteristicas, i)
             updateEnfermedades(collections, i)
-        except:
-            pass
+        except Exception as e:
+            print "ERROR: ", i
+            print e
         print ""
         print "FALTAN ", (len(urls) - i ) ," iteraciones"
         print ""
@@ -105,6 +100,21 @@ def getSintomasURLs():
     urls = re.findall(pattern, htmltext)
     return urls
 
+def insertCaracteristicasInCollection(caracteristicas, i):
+    collections = {}
+    for j in range(len(caracteristicas[i])):
+        try:
+            print "    CARACTERISTICAS: " + caracteristicas[i][j].decode('utf-8')
+            collection = { 'description': caracteristicas[i][j].decode('utf-8') }
+            #print collection
+            collection = colcaracteristicas.insert(collection)
+            #collections[str(j)] = { 'id': collection._id }
+        except Exception as e:
+            print "ERROR: ", j
+            print e
+    print "COLECCION: ",collections
+    return collections
+
 def getSintomasByURLs(urls):
     sintomas = {}
     for n in range(len(urls)):
@@ -120,17 +130,63 @@ def getSintomasByURLs(urls):
         except Exception as e:
             print "ERROR: "
             print e
+
+        #raw_input()
+        
     print sintomas
     return sintomas
 
+def updateSintomas(collections, i):
+    #print ''
+    #print 'COLLECTIONs: ' 
+    #print collections
+    try:
+        colsintomas.update( { 'id': i }, { '$set' : { 'caracteristicas': collections } } )
+    except Exception as e:
+        print "ERROR: " 
+        print e
 
-'''
-colenfermedades.insert(enfermedades)
-colcaracteristicas.insert(sintomas)
-'''
-urls = getEnfermedadesURL()
-enfermedades = getEnfermedadesByURLs(urls)
-caracteristicas = getCaracteristicasByEnfermedades(urls)
+def parseUrlContent(urlArray):
+    contents = {}
+    for i in range(len(urlArray)):
+        regex = "<a href='\w'>(.+?)</li>"
+        pattern = re.compile(regex)
+        temp = re.findall(pattern, urlArray[i])
+        contents[i] = temp[0]
+    return contents
+
+def getCaracteristicasBySintomas(urls):
+    caracteristicas = {}
+    #for i in range(len(urls)):
+    for i in range(10):
+        html = urllib.urlopen(URL + '/tengo/' + urls[i] ).read()
+        regex = "<li class='liadd'>(.+?)</li>"
+        pattern = re.compile(regex)
+        caracteristicas[i] = re.findall(pattern, html)
+        raw_input()
+        os.system('cls')
+        print caracteristicas[i]       
+        try:
+            print sintomas[i]
+            collections = insertCaracteristicasInCollection(caracteristicas, i)
+            updateSintomas(collections, i)
+        except Exception as e:
+            print "ERROR: ", i
+            print e
+        print ""
+        print "FALTAN ", (len(urls) - i ) ," iteraciones"
+        print ""
+        print ""
+    return caracteristicas
+
+def UpdateSintomasWithCaracteristicas(sintomas):
+    pass
 
 urls = getSintomasURLs()
 sintomas = getSintomasByURLs(urls)
+caracteristicasBySintomas = getCaracteristicasBySintomas(urls)
+#UpdateSintomasWithCaracteristicas(sintomas)
+
+#urls = getEnfermedadesURL()
+#enfermedades = getEnfermedadesByURLs(urls)
+#caracteristicas = getCaracteristicasByEnfermedades(urls)
